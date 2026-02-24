@@ -110,6 +110,15 @@ DARK_TEMPLATE = """<!DOCTYPE html>
       transform: translateY(-2px);
     }
 
+    .avatar {
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      object-fit: cover;
+      margin-bottom: 24px;
+      opacity: 0; animation: fadeUp 0.6s 0.1s forwards;
+    }
+
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
@@ -226,6 +235,9 @@ DARK_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
   <section class="hero">
+    {% if photo_b64 %}
+    <img src="data:image/jpeg;base64,{{ photo_b64 }}" class="avatar" alt="{{ full_name }}"/>
+    {% endif %}
     <p class="hero-label">// Portfolio</p>
     <h1>{{ full_name }}</h1>
     <p class="hero-profession">{{ profession }}</p>
@@ -327,6 +339,15 @@ LIGHT_TEMPLATE = """<!DOCTYPE html>
       padding: 80px;
       display: flex; flex-direction: column; gap: 32px;
     }
+    .avatar {
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--accent);
+      margin-bottom: 20px;
+      display: block;
+    }
+
     .tag {
       display: inline-block;
       padding: 4px 12px;
@@ -453,6 +474,9 @@ LIGHT_TEMPLATE = """<!DOCTYPE html>
 <body>
   <div class="hero">
     <div class="hero-left">
+      {% if photo_b64 %}
+      <img src="data:image/jpeg;base64,{{ photo_b64 }}" class="avatar" alt="{{ full_name }}"/>
+      {% endif %}
       <span class="tag">Portfolio</span>
       <h1>{{ full_name }}</h1>
       <p class="profession">{{ profession }}</p>
@@ -554,6 +578,15 @@ CREATIVE_TEMPLATE = """<!DOCTYPE html>
       padding: 60px;
       position: relative; overflow: hidden;
     }
+    .avatar {
+      width: 80px; height: 80px;
+      border-radius: 4px;
+      object-fit: cover;
+      border: 2px solid var(--yellow);
+      position: absolute;
+      top: 40px; left: 60px;
+    }
+
     .hero-bg-text {
       position: absolute;
       top: 50%; left: 50%;
@@ -735,6 +768,9 @@ CREATIVE_TEMPLATE = """<!DOCTYPE html>
 <body>
   <div class="hero">
     <div class="hero-bg-text">{{ full_name.upper() }}</div>
+    {% if photo_b64 %}
+    <img src="data:image/jpeg;base64,{{ photo_b64 }}" class="avatar" alt="{{ full_name }}"/>
+    {% endif %}
     <div class="hero-top">
       {% if github %}<a href="https://{{ github }}" target="_blank">GitHub</a>{% endif %}
       {% if linkedin %}<a href="https://{{ linkedin }}" target="_blank">LinkedIn</a>{% endif %}
@@ -831,6 +867,7 @@ def generate_portfolio(data: dict, output_path: str):
         skills=data.get("skills", []),
         experience=data.get("experience", []),
         projects=data.get("projects", []),
+        photo_b64=data.get("photo_b64", ""),
         github=data.get("github", ""),
         linkedin=data.get("linkedin", ""),
         email=data.get("email", ""),
