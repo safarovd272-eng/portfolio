@@ -1,10 +1,8 @@
 import asyncio
 import logging
 import os
-import random
-
-# Har bir foydalanuvchi uchun navbat hisoblagichi
-user_template_counter: dict = {}
+import base64
+import io
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
@@ -21,12 +19,16 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token="8587190645:AAE0q_5DSnRpHcyg8WE248l29gSKZ1CuDe8")
 dp = Dispatcher(storage=MemoryStorage())
 
+# Har bir foydalanuvchi uchun navbat hisoblagichi
+user_template_counter: dict = {}
+
 
 # ─── STATES ───────────────────────────────────────────────
 class Form(StatesGroup):
     full_name  = State()
     profession = State()
     bio        = State()
+    photo      = State()   # << YANGI
     skills     = State()
     experience = State()
     projects   = State()
@@ -36,7 +38,7 @@ class Form(StatesGroup):
     phone      = State()
 
 
-# ─── KEYBOARD ─────────────────────────────────────────────
+# ─── KEYBOARDS ────────────────────────────────────────────
 def skip_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⏭ O'tkazib yuborish", callback_data="skip")]
@@ -44,6 +46,14 @@ def skip_kb():
 
 
 # ─── HELPERS ──────────────────────────────────────────────
+async def ask_photo(target: Message, state: FSMContext):
+    await target.answer(
+        "📸 Profil rasmingizni yuboring!\n"
+        "Yo'q bo'lsa ⏭ tugmasini bosing.",
+        reply_markup=skip_kb()
+    )
+    await state.set_state(Form.photo)
+
 async def ask_experience(target: Message, state: FSMContext):
     await target.answer(
         "🏢 Ish tajribangizni kiriting (har biri yangi qatorda):\n\n"
@@ -89,11 +99,11 @@ async def ask_phone(target: Message, state: FSMContext):
 
 
 async def generate_and_send(target: Message, state: FSMContext):
-    """Ma'lumotlarni yig'ib, tasodifiy template bilan portfolio yaratadi."""
     data = await state.get_data()
     data.setdefault("full_name",  "Ism Familiya")
     data.setdefault("profession", "Mutaxassis")
     data.setdefault("bio",        "")
+    data.setdefault("photo_b64",  "")
     data.setdefault("skills",     [])
     data.setdefault("experience", [])
     data.setdefault("projects",   [])
@@ -188,12 +198,37 @@ async def get_profession(message: Message, state: FSMContext):
 @dp.message(Form.bio)
 async def get_bio(message: Message, state: FSMContext):
     await state.update_data(bio=message.text.strip())
+    await ask_photo(message, state)
+
+
+# Rasm yuklash
+@dp.message(Form.photo, F.photo)
+async def get_photo(message: Message, state: FSMContext):
+    # Eng katta o'lchamdagi rasmni olamiz
+    photo = message.photo[-1]
+    file = await bot.get_file(photo.file_id)
+    
+    # Rasmni yuklab base64 ga aylantiramiz
+    file_bytes = await bot.download_file(file.file_path)
+    b64 = base64.b64encode(file_bytes.read()).decode("utf-8")
+    
+    await state.update_data(photo_b64=b64)
+    await message.answer("✅ Rasm saqlandi!")
     await message.answer(
         "🛠 Ko'nikmalaringizni kiriting (vergul bilan):\n\n"
         "<code>Python, Django, PostgreSQL, Docker</code>",
         parse_mode="HTML"
     )
     await state.set_state(Form.skills)
+
+
+# Rasm o'rniga matn yuborsа
+@dp.message(Form.photo, F.text)
+async def photo_text_fallback(message: Message, state: FSMContext):
+    await message.answer(
+        "📸 Iltimos rasm yuboring yoki ⏭ tugmasini bosing.",
+        reply_markup=skip_kb()
+    )
 
 
 @dp.message(Form.skills)
@@ -266,7 +301,16 @@ async def handle_skip(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     current = await state.get_state()
 
-    if current == Form.experience.state:
+    if current == Form.photo.state:
+        await state.update_data(photo_b64="")
+        await callback.message.answer(
+            "🛠 Ko'nikmalaringizni kiriting (vergul bilan):\n\n"
+            "<code>Python, Django, PostgreSQL, Docker</code>",
+            parse_mode="HTML"
+        )
+        await state.set_state(Form.skills)
+
+    elif current == Form.experience.state:
         await state.update_data(experience=[])
         await ask_projects(callback.message, state)
 
