@@ -232,40 +232,62 @@ async def get_phone(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("template_"))
 async def choose_template(callback: CallbackQuery, state: FSMContext):
-    template = callback.data.replace("template_", "")
-    await state.update_data(template=template)
-    await callback.answer()
+    try:
+        template = callback.data.replace("template_", "")
+        await state.update_data(template=template)
+        await callback.answer()
 
-    data = await state.get_data()
-    await callback.message.answer("⏳ Portfolio yaratilmoqda...")
+        data = await state.get_data()
 
-    # Generate HTML
-    user_id = callback.from_user.id
-    filename = f"portfolio_{user_id}.html"
-    filepath = f"/tmp/{filename}"
+        # Default qiymatlar — None bo'lsa xato chiqmasin
+        data.setdefault("full_name", "Ism Familiya")
+        data.setdefault("profession", "Mutaxassis")
+        data.setdefault("bio", "")
+        data.setdefault("skills", [])
+        data.setdefault("experience", [])
+        data.setdefault("projects", [])
+        data.setdefault("github", "")
+        data.setdefault("linkedin", "")
+        data.setdefault("email", "")
+        data.setdefault("phone", "")
 
-    generate_portfolio(data, filepath)
+        await callback.message.answer("⏳ Portfolio yaratilmoqda...")
 
-    # Send file
-    doc = FSInputFile(filepath, filename="portfolio.html")
-    await callback.message.answer_document(
-        doc,
-        caption=(
-            "✅ <b>Portfolio tayyor!</b>\n\n"
-            "📌 <b>GitHub Pages orqali joylash:</b>\n"
-            "1. github.com → New repository\n"
-            "2. Faylni yuklang\n"
-            "3. Settings → Pages → Deploy\n"
-            "4. Link oling: <code>username.github.io/repo-name</code>\n\n"
-            "📌 <b>Netlify (osonroq):</b>\n"
-            "1. netlify.com → Drop faylni\n"
-            "2. Tayyor! Link olasiz ✨\n\n"
-            "Yangi portfolio uchun /start"
-        ),
-        parse_mode="HTML"
-    )
-    os.remove(filepath)
-    await state.clear()
+        # Generate HTML
+        user_id = callback.from_user.id
+        filepath = f"/tmp/portfolio_{user_id}.html"
+
+        generate_portfolio(data, filepath)
+
+        # Send file
+        doc = FSInputFile(filepath, filename="portfolio.html")
+        await callback.message.answer_document(
+            doc,
+            caption=(
+                "✅ <b>Portfolio tayyor!</b>\n\n"
+                "📌 <b>Netlify (eng oson — 1 daqiqa):</b>\n"
+                "1. netlify.com ga kiring\n"
+                "2. Faylni drag & drop qiling\n"
+                "3. Bepul link olasiz ✨\n\n"
+                "📌 <b>GitHub Pages:</b>\n"
+                "1. Yangi repo yarating\n"
+                "2. Faylni <code>index.html</code> deb yuklang\n"
+                "3. Settings → Pages → Deploy\n"
+                "4. <code>username.github.io/repo-name</code>\n\n"
+                "Yangi portfolio uchun /start"
+            ),
+            parse_mode="HTML"
+        )
+        os.remove(filepath)
+        await state.clear()
+
+    except Exception as e:
+        await callback.message.answer(
+            f"❌ Xato yuz berdi:\n<code>{str(e)}</code>\n\n"
+            "Qaytadan urinish uchun /start",
+            parse_mode="HTML"
+        )
+        await state.clear()
 
 
 async def main():
