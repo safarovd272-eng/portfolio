@@ -743,7 +743,7 @@ CREATIVE_TEMPLATE = """<!DOCTYPE html>
     <div class="hero-name">
       {% set parts = full_name.split() %}
       {% if parts|length > 1 %}
-        {{ parts[0] }} <span>{{ parts[1:] | join(' ') }}</span>
+        {{ parts[0] }} <span>{% for p in parts %}{% if not loop.first %}{{ p }}{% if not loop.last %} {% endif %}{% endif %}{% endfor %}</span>
       {% else %}
         <span>{{ full_name }}</span>
       {% endif %}
