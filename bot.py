@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import random
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
@@ -30,24 +31,12 @@ class Form(StatesGroup):
     linkedin   = State()
     email      = State()
     phone      = State()
-    template   = State()
 
 
-# ─── KEYBOARDS ────────────────────────────────────────────
+# ─── KEYBOARD ─────────────────────────────────────────────
 def skip_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⏭ O'tkazib yuborish", callback_data="skip")]
-    ])
-
-def template_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🌙 Dark Modern",   callback_data="tpl_dark"),
-            InlineKeyboardButton(text="☀️ Light Clean",   callback_data="tpl_light"),
-        ],
-        [
-            InlineKeyboardButton(text="🎨 Creative Bold", callback_data="tpl_creative"),
-        ]
     ])
 
 
@@ -95,12 +84,64 @@ async def ask_phone(target: Message, state: FSMContext):
     )
     await state.set_state(Form.phone)
 
-async def ask_template(target: Message, state: FSMContext):
-    await target.answer(
-        "🎨 Portfolio dizayni tanlang:",
-        reply_markup=template_kb()
-    )
-    await state.set_state(Form.template)
+
+async def generate_and_send(target: Message, state: FSMContext):
+    """Ma'lumotlarni yig'ib, tasodifiy template bilan portfolio yaratadi."""
+    data = await state.get_data()
+    data.setdefault("full_name",  "Ism Familiya")
+    data.setdefault("profession", "Mutaxassis")
+    data.setdefault("bio",        "")
+    data.setdefault("skills",     [])
+    data.setdefault("experience", [])
+    data.setdefault("projects",   [])
+    data.setdefault("github",     "")
+    data.setdefault("linkedin",   "")
+    data.setdefault("email",      "")
+    data.setdefault("phone",      "")
+
+    # Tasodifiy template tanlanadi
+    template = random.choice(["dark", "light", "creative"])
+    data["template"] = template
+
+    template_names = {
+        "dark":     "🌙 Dark Modern",
+        "light":    "☀️ Light Clean",
+        "creative": "🎨 Creative Bold",
+    }
+
+    await target.answer(f"⏳ Portfolio yaratilmoqda... ({template_names[template]})")
+
+    try:
+        filepath = f"/tmp/portfolio_{target.chat.id}.html"
+        generate_portfolio(data, filepath)
+
+        doc = FSInputFile(filepath, filename="portfolio.html")
+        await target.answer_document(
+            doc,
+            caption=(
+                f"✅ <b>Portfolio tayyor!</b> ({template_names[template]})\n\n"
+                "📌 <b>Netlify orqali joylash (1 daqiqa):</b>\n"
+                "1. netlify.com ga kiring\n"
+                "2. Faylni sahifaga tashlang (drag & drop)\n"
+                "3. Bepul link olasiz ✨\n\n"
+                "📌 <b>GitHub Pages:</b>\n"
+                "1. Yangi repo → faylni <code>index.html</code> deb yuklang\n"
+                "2. Settings → Pages → Deploy\n"
+                "3. <code>username.github.io/repo-name</code>\n\n"
+                "🔄 Yangi portfolio uchun /start"
+            ),
+            parse_mode="HTML"
+        )
+        os.remove(filepath)
+
+    except Exception as e:
+        await target.answer(
+            f"❌ Xato yuz berdi:\n<code>{e}</code>\n\n"
+            "/start bilan qayta urinib ko'ring.",
+            parse_mode="HTML"
+        )
+
+    await state.clear()
 
 
 # ─── START ────────────────────────────────────────────────
@@ -126,7 +167,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
 @dp.message(Form.full_name)
 async def get_name(message: Message, state: FSMContext):
     await state.update_data(full_name=message.text.strip())
-    await message.answer("Yaxshi!\n\n💼 Kasbingiz/Lavozimingiz? (masalan: Python Developer)")
+    await message.answer("✅ Yaxshi!\n\n💼 Kasbingiz/Lavozimingiz? (masalan: Python Developer)")
     await state.set_state(Form.profession)
 
 
@@ -209,7 +250,7 @@ async def get_email(message: Message, state: FSMContext):
 @dp.message(Form.phone)
 async def get_phone(message: Message, state: FSMContext):
     await state.update_data(phone=message.text.strip())
-    await ask_template(message, state)
+    await generate_and_send(message, state)
 
 
 # ─── SKIP HANDLER ─────────────────────────────────────────
@@ -237,65 +278,11 @@ async def handle_skip(callback: CallbackQuery, state: FSMContext):
 
     elif current == Form.phone.state:
         await state.update_data(phone="")
-        await ask_template(callback.message, state)
+        await generate_and_send(callback.message, state)
 
     else:
         await callback.message.answer("Noaniq holat. /start bilan qayta boshlang.")
         await state.clear()
-
-
-# ─── TEMPLATE SELECT & GENERATE ───────────────────────────
-@dp.callback_query(F.data.startswith("tpl_"))
-async def choose_template(callback: CallbackQuery, state: FSMContext):
-    await callback.answer()
-    template = callback.data.replace("tpl_", "")
-    await state.update_data(template=template)
-
-    data = await state.get_data()
-    data.setdefault("full_name",  "Ism Familiya")
-    data.setdefault("profession", "Mutaxassis")
-    data.setdefault("bio",        "")
-    data.setdefault("skills",     [])
-    data.setdefault("experience", [])
-    data.setdefault("projects",   [])
-    data.setdefault("github",     "")
-    data.setdefault("linkedin",   "")
-    data.setdefault("email",      "")
-    data.setdefault("phone",      "")
-
-    await callback.message.answer("⏳ Portfolio yaratilmoqda...")
-
-    try:
-        filepath = f"/tmp/portfolio_{callback.from_user.id}.html"
-        generate_portfolio(data, filepath)
-
-        doc = FSInputFile(filepath, filename="portfolio.html")
-        await callback.message.answer_document(
-            doc,
-            caption=(
-                "✅ <b>Portfolio tayyor!</b>\n\n"
-                "📌 <b>Netlify orqali joylash (1 daqiqa):</b>\n"
-                "1. netlify.com ga kiring\n"
-                "2. Faylni sahifaga tashlang (drag & drop)\n"
-                "3. Bepul link olasiz ✨\n\n"
-                "📌 <b>GitHub Pages:</b>\n"
-                "1. Yangi repo → faylni <code>index.html</code> deb yuklang\n"
-                "2. Settings → Pages → Deploy\n"
-                "3. <code>username.github.io/repo-name</code>\n\n"
-                "🔄 Yangi portfolio uchun /start"
-            ),
-            parse_mode="HTML"
-        )
-        os.remove(filepath)
-
-    except Exception as e:
-        await callback.message.answer(
-            f"❌ Xato yuz berdi:\n<code>{e}</code>\n\n"
-            "/start bilan qayta urinib ko'ring.",
-            parse_mode="HTML"
-        )
-
-    await state.clear()
 
 
 # ─── RUN ──────────────────────────────────────────────────
