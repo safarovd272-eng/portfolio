@@ -3,6 +3,9 @@ import logging
 import os
 import random
 
+# Har bir foydalanuvchi uchun navbat hisoblagichi
+user_template_counter: dict = {}
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import CommandStart, Command
@@ -99,8 +102,12 @@ async def generate_and_send(target: Message, state: FSMContext):
     data.setdefault("email",      "")
     data.setdefault("phone",      "")
 
-    # Tasodifiy template tanlanadi
-    template = random.choice(["dark", "light", "creative"])
+    # Navbat bilan template: Dark → Light → Creative → Dark → ...
+    templates = ["dark", "light", "creative"]
+    user_id = target.chat.id
+    count = user_template_counter.get(user_id, 0)
+    template = templates[count % 3]
+    user_template_counter[user_id] = count + 1
     data["template"] = template
 
     template_names = {
