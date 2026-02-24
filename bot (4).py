@@ -15,7 +15,7 @@ from generator import generate_portfolio
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token="8587190645:AAE0q_5DSnRpHcyg8WE248l29gSKZ1CuDe8")
 dp = Dispatcher(storage=MemoryStorage())
 
 
